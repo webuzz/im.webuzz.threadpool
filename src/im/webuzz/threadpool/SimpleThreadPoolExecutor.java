@@ -103,6 +103,7 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
     public SimpleThreadPoolExecutor(ThreadPoolExecutorConfig config, RejectedExecutionHandler handler) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
+				new SimpleNamedThreadFactory(config.workerName),
 				handler);
     }
 
@@ -123,6 +124,9 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory, handler);
+		if (threadFactory instanceof SimpleNamedThreadFactory) {
+			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
+		}
     }
 
 	public SimpleThreadPoolExecutor(int corePoolSize, int maximumPoolSize,
@@ -141,6 +145,9 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory);
+		if (threadFactory instanceof SimpleNamedThreadFactory) {
+			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
+		}
     }
 
 	public SimpleThreadPoolExecutor(int corePoolSize, int maximumPoolSize,
@@ -155,7 +162,7 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
 	}
 	public SimpleThreadPoolExecutor(ThreadPoolExecutorConfig config) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
-				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks);
+				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks, config.workerName);
     }
 
 	public SimpleThreadPoolExecutor(int corePoolSize, int maximumPoolSize,
@@ -169,11 +176,6 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
 		this.queueSize = Math.max(1, queueSize);
 		((SimpleBlockingQueue) getQueue()).setExecutor(this);
 	}
-    public SimpleThreadPoolExecutor(ThreadPoolExecutorConfig config, String poolName) {
-		this(config.coreThreads, config.maxThreads, config.idleThreads,
-				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
-				poolName);
-    }
 
 	public int getIdlePoolSize() {
 		return idlePoolSize;
@@ -189,6 +191,13 @@ public class SimpleThreadPoolExecutor extends ThreadPoolExecutor {
 	
 	public void setQueueSize(int queueSize) {
 		this.queueSize = Math.max(1, queueSize);
+	}
+	
+	public void updateWorkerName(String workerName) {
+		ThreadFactory threadFactory = getThreadFactory();
+		if (threadFactory instanceof SimpleNamedThreadFactory) {
+			((SimpleNamedThreadFactory) threadFactory).updatePrefix(workerName);
+		}
 	}
 	
 	@Override

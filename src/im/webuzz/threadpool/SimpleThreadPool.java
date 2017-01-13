@@ -1,31 +1,38 @@
 package im.webuzz.threadpool;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Properties;
 import java.util.concurrent.ThreadPoolExecutor;
 
 public class SimpleThreadPool {
 
+	public static final String configKeyPrefix = "simplepool";
+	
+	public static ThreadPoolExecutorConfig pool = new ThreadPoolExecutorConfig();
+	
+	private static ThreadPoolExecutorConfig lastConfig = pool;
 	private static SimpleThreadPoolExecutor poolExecutor;
-
 	private static boolean poolInitialized = false;
 	
-	private static ThreadPoolExecutorConfig lastConfig = SimpleThreadConfig.simpleWorkerPool;
+	public static void update(Properties props) {
+		if (!poolInitialized || poolExecutor == null) return;
+		ThreadPoolExecutorConfig sc = pool;
+		if (sc == null) return;
+		sc.updatePoolWithComparison(poolExecutor, lastConfig);
+		lastConfig = sc;
+	}
 
 	public static void initializePool() {
-		if (poolInitialized) {
-			return;
-		}
+		if (poolInitialized) return;
 		synchronized (SimpleThreadPool.class) {
-			if (poolInitialized) {
-				return;
-			}
-			lastConfig = SimpleThreadConfig.simpleWorkerPool;
+			if (poolInitialized) return;
+			lastConfig = pool;
 			if (lastConfig == null) {
 				lastConfig = new ThreadPoolExecutorConfig();
+				lastConfig.workerName = "Simple Worker";
 			}
-			poolExecutor = new SimpleThreadPoolExecutor(lastConfig, "Simple Worker");
+			poolExecutor = new SimpleThreadPoolExecutor(lastConfig);
 			poolExecutor.allowCoreThreadTimeOut(lastConfig.threadTimeout);
 			poolInitialized = true;
 		}
@@ -38,32 +45,20 @@ public class SimpleThreadPool {
 				if (sPEMethod != null && (sPEMethod.getModifiers() & Modifier.STATIC) != 0) {
 					sPEMethod.invoke(sthClass, poolExecutor);
 				}
-			} catch (SecurityException e) {
-				e.printStackTrace();
-			} catch (IllegalArgumentException e) {
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				e.printStackTrace();
-			} catch (NoSuchMethodException e) {
-				e.printStackTrace();
-			} catch (IllegalAccessException e) {
-				e.printStackTrace();
-			} catch (InvocationTargetException e) {
+			} catch (Throwable e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
-	public static void updatePoolConfigurations() {
-		if (!poolInitialized || poolExecutor == null) {
-			return;
-		}
-		ThreadPoolExecutorConfig sc = SimpleThreadConfig.simpleWorkerPool;
-		if (sc == null) {
-			return;
-		}
-		sc.updatePoolWithComparison(poolExecutor, lastConfig);
-		lastConfig = sc;
+	public static SimpleThreadPoolExecutor getPoolExecutor() {
+		initializePool();
+		return poolExecutor;
+	}
+	
+	public static void execute(Runnable task) {
+		initializePool();
+		poolExecutor.execute(task);
 	}
 
 }

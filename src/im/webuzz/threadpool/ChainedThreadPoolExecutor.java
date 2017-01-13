@@ -61,6 +61,7 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
     public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, RejectedExecutionHandler handler) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
+				new SimpleNamedThreadFactory(config.workerName),
 				handler);
     }
 
@@ -69,11 +70,6 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 		super(corePoolSize, maximumPoolSize, idlePoolSize, keepAliveTime, unit, queueSize, poolName);
 		fetchInternalFields();
 	}
-    public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, String poolName) {
-		this(config.coreThreads, config.maxThreads, config.idleThreads,
-				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
-				poolName);
-    }
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
 			TimeUnit unit, int queueSize, ThreadFactory threadFactory, RejectedExecutionHandler handler) {
@@ -85,6 +81,9 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory, handler);
+		if (threadFactory instanceof SimpleNamedThreadFactory) {
+			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
+		}
     }
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
@@ -96,6 +95,9 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory);
+		if (threadFactory instanceof SimpleNamedThreadFactory) {
+			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
+		}
     }
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
@@ -105,7 +107,7 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 	}
 	public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
-				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks);
+				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks, config.workerName);
     }
     
     private boolean addIfInQueue(ChainedRunnable task) {

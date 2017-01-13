@@ -39,6 +39,11 @@ public class ThreadPoolExecutorConfig {
 	 * Queue. Default is 100.
 	 */
 	public int queueTasks = 100;
+	
+	/**
+	 * Thread name.
+	 */
+	public String workerName = null;
 
 	@Override
 	public int hashCode() {
@@ -50,6 +55,7 @@ public class ThreadPoolExecutorConfig {
 		result = prime * result + queueTasks;
 		result = prime * result + (int) (threadIdleSeconds ^ (threadIdleSeconds >>> 32));
 		result = prime * result + (threadTimeout ? 1231 : 1237);
+		result = prime * result + ((workerName == null) ? 0 : workerName.hashCode());
 		return result;
 	}
 
@@ -74,8 +80,14 @@ public class ThreadPoolExecutorConfig {
 			return false;
 		if (threadTimeout != other.threadTimeout)
 			return false;
+		if (workerName == null) {
+			if (other.workerName != null)
+				return false;
+		} else if (!workerName.equals(other.workerName))
+			return false;
 		return true;
 	}
+
 
 	public void updatePoolWithComparison(ThreadPoolExecutor pool, ThreadPoolExecutorConfig lastConfig) {
 		if (lastConfig.coreThreads != coreThreads) {
@@ -117,6 +129,13 @@ public class ThreadPoolExecutorConfig {
 		}
 		if (lastConfig.threadTimeout != threadTimeout) {
 			pool.allowCoreThreadTimeOut(threadTimeout);
+		}
+		if (lastConfig.workerName == null) {
+			if (workerName != null) {
+				((SimpleThreadPoolExecutor) pool).updateWorkerName(workerName);
+			}
+		} else if (!lastConfig.workerName.equals(workerName)) {
+			((SimpleThreadPoolExecutor) pool).updateWorkerName(workerName);
 		}
 	}
 	

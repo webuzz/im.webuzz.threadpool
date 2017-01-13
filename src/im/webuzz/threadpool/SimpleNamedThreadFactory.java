@@ -19,22 +19,26 @@ import java.util.concurrent.ThreadFactory;
 public class SimpleNamedThreadFactory implements ThreadFactory {
     final ThreadGroup group;
     final AtomicInteger threadNumber = new AtomicInteger(1);
-    final String namePrefix;
+    protected String namePrefix;
 
     public SimpleNamedThreadFactory(String prefix) {
         SecurityManager s = System.getSecurityManager();
-        group = (s != null)? s.getThreadGroup() :
-                             Thread.currentThread().getThreadGroup();
-        namePrefix = prefix + "-";
+        group = (s != null)? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
+        updatePrefix(prefix);
     }
 
     public Thread newThread(Runnable r) {
-        Thread t = new Thread(group, r,
-                              namePrefix + threadNumber.getAndIncrement(),
-                              0);
+        Thread t = new Thread(group, r, namePrefix + threadNumber.getAndIncrement(), 0);
         if (t.getPriority() != Thread.NORM_PRIORITY)
             t.setPriority(Thread.NORM_PRIORITY);
         return t;
     }
 
+    public void updatePrefix(String prefix) {
+    	if (prefix == null || prefix.length() == 0) {
+    		namePrefix = "Thread-";
+    	} else {
+    		namePrefix = prefix + "-";
+    	}
+    }
 }
