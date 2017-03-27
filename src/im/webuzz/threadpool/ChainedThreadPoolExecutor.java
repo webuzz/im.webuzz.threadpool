@@ -121,9 +121,12 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 				ChainedRunnable runningTask = runningTasks.get(worker);
 				if (runningTask != null && runningTask.getOwner() == owner) {
 					//System.out.println("Appending task " + task + " to running task " + runningTask + " on worker " + worker);
-					runningTask.addNext(task);
-			        lastTasks.put(owner, task);
-					return true;
+					if (runningTask.addNext(task)) {
+						lastTasks.put(owner, task);
+						return true;
+					} else { // runningTask just finished, continue to execute
+						return false;
+					}
 				}
 				ChainedRunnable firstTask = null; // worker.firstTask;
 				try {
@@ -152,9 +155,12 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 				}
 				if (firstTask != null && firstTask.getOwner() == owner) {
 					//System.out.println("Appending task " + task + " to first task " + runningTask + " on worker " + worker);
-					firstTask.addNext(task);
-			        lastTasks.put(owner, task);
-					return true;
+					if (firstTask.addNext(task)) {
+						lastTasks.put(owner, task);
+						return true;
+					} else { // runningTask just finished, continue to execute
+						return false;
+					}
 				}
 			}
         	for (Iterator<Runnable> itr = getQueue().iterator(); itr.hasNext();) {
@@ -163,18 +169,24 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 					ChainedRunnable r = (ChainedRunnable) next;
 					if (r.getOwner() == owner) {
 						//System.out.println("Appending task " + task + " to queued task " + r);
-						r.addNext(task);
-				        lastTasks.put(owner, task);
-						return true;
+						if (r.addNext(task)) {
+					        lastTasks.put(owner, task);
+							return true;
+						} else { // runningTask just finished, continue to execute
+							return false;
+						}
 					}
 				}
 			}
         	ChainedRunnable last = lastTasks.get(owner);
         	if (last != null && !last.isDone()) {
 				//System.out.println("Appending task " + task + " to last task " + last);
-        		last.addNext(task);
-		        lastTasks.put(owner, task);
-        		return true;
+        		if (last.addNext(task)) {
+			        lastTasks.put(owner, task);
+	        		return true;
+				} else { // runningTask just finished, continue to execute
+        			return false;
+        		}
         	}
         	
             //System.out.println("Not in queue, starting new worker for " + task);
