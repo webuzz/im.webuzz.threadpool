@@ -10,6 +10,8 @@ public class ChainedRunnable implements Runnable {
 	
 	private volatile ChainedRunnable next;
 	
+	private volatile ChainedRunnable lastRun;
+	
 	private Object owner;
 
 	private volatile boolean done;
@@ -20,6 +22,7 @@ public class ChainedRunnable implements Runnable {
 		super();
 		this.owner = owner;
 		this.task = task;
+		lastRun = null;
 		done = false;
 	}
 	
@@ -30,10 +33,10 @@ public class ChainedRunnable implements Runnable {
 	}
 
 	public void run() {
-		runWithRoot(null);
+		lastRun = runWithRoot(null);
 	}
 	
-	public void runWithRoot(ChainedRunnable root) {
+	public ChainedRunnable runWithRoot(ChainedRunnable root) {
 		runTask();
 		// May run into stack overflow!
 		//if (next != null) {
@@ -41,7 +44,7 @@ public class ChainedRunnable implements Runnable {
 		//}
 		ChainedRunnable last = this;
 		ChainedRunnable n = next;
-		Queue<ChainedRunnable> queue = new LinkedList<ChainedRunnable>(); 
+		Queue<ChainedRunnable> queue = new LinkedList<ChainedRunnable>();
 		while (n != null) {
 			queue.add(n);
 			n.runTask();
@@ -72,7 +75,9 @@ public class ChainedRunnable implements Runnable {
 			}
 		}
 		if (finalTask != null) {
-			finalTask.runWithRoot(root);
+			return finalTask.runWithRoot(root);
+		} else {
+			return last;
 		}
 	}
 	
@@ -88,6 +93,10 @@ public class ChainedRunnable implements Runnable {
 		return task;
 	}
 
+	public ChainedRunnable getLastRun() {
+		return lastRun;
+	}
+	
 	// Not thread safe!
 	public boolean addNext(ChainedRunnable task) {
 		if (lock == null) {

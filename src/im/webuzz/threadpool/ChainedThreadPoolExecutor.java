@@ -11,6 +11,8 @@ import java.util.*;
 
 public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 
+	public static boolean peekingPoolStatus = false;
+	
 	private ReentrantLock internalMainLock = null;
 	
 	private Set<Runnable> internalWorkers = null;
@@ -19,7 +21,7 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 
 	private Field fieldWorkerFirstTask = null;
 
-	private Map<Runnable, ChainedRunnable> runningTasks = new ConcurrentHashMap<Runnable, ChainedRunnable>();
+	private Map<Runnable, ChainedRunnable> currentTasks = new ConcurrentHashMap<Runnable, ChainedRunnable>();
 	
 	private Map<Object, ChainedRunnable> lastTasks = new ConcurrentHashMap<Object, ChainedRunnable>();
 	
@@ -58,12 +60,12 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 		super(corePoolSize, maximumPoolSize, idlePoolSize, keepAliveTime, unit, queueSize, handler);
 		fetchInternalFields();
 	}
-    public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, RejectedExecutionHandler handler) {
+	public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, RejectedExecutionHandler handler) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				new SimpleNamedThreadFactory(config.workerName),
 				handler);
-    }
+	}
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
 			TimeUnit unit, int queueSize, String poolName) {
@@ -76,29 +78,29 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 		super(corePoolSize, maximumPoolSize, idlePoolSize, keepAliveTime, unit, queueSize, threadFactory, handler);
 		fetchInternalFields();
 	}
-    public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, ThreadFactory threadFactory,
-    		RejectedExecutionHandler handler) {
+	public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, ThreadFactory threadFactory,
+			RejectedExecutionHandler handler) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory, handler);
 		if (threadFactory instanceof SimpleNamedThreadFactory) {
 			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
 		}
-    }
+	}
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
 			TimeUnit unit, int queueSize, ThreadFactory threadFactory) {
 		super(corePoolSize, maximumPoolSize, idlePoolSize, keepAliveTime, unit, queueSize, threadFactory);
 		fetchInternalFields();
 	}
-    public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, ThreadFactory threadFactory) {
+	public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config, ThreadFactory threadFactory) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks,
 				threadFactory);
 		if (threadFactory instanceof SimpleNamedThreadFactory) {
 			((SimpleNamedThreadFactory) threadFactory).updatePrefix(config.workerName);
 		}
-    }
+	}
 
 	public ChainedThreadPoolExecutor(int corePoolSize, int maximumPoolSize, int idlePoolSize, long keepAliveTime,
 			TimeUnit unit, int queueSize) {
@@ -108,17 +110,17 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 	public ChainedThreadPoolExecutor(ThreadPoolExecutorConfig config) {
 		this(config.coreThreads, config.maxThreads, config.idleThreads,
 				config.threadIdleSeconds, TimeUnit.SECONDS, config.queueTasks, config.workerName);
-    }
-    
-    private boolean addIfInQueue(ChainedRunnable task) {
-        Object owner = task.getOwner();
-        final ReentrantLock mainLock = this.internalMainLock;
-        mainLock.lock();
-        try {
-        	//System.out.println("Worker size = " + internalWorkers.size());
+	}
+	
+	private boolean addIfInQueue(ChainedRunnable task) {
+		Object owner = task.getOwner();
+		final ReentrantLock mainLock = this.internalMainLock;
+		mainLock.lock();
+		try {
+			//System.out.println("Worker size = " + internalWorkers.size());
 			for (Iterator<Runnable> itr = internalWorkers.iterator(); itr.hasNext();) {
 				Runnable worker = (Runnable) itr.next();
-				ChainedRunnable runningTask = runningTasks.get(worker);
+				ChainedRunnable runningTask = currentTasks.get(worker);
 				if (runningTask != null && runningTask.getOwner() == owner) {
 					//System.out.println("Appending task " + task + " to running task " + runningTask + " on worker " + worker);
 					if (runningTask.addNext(task)) {
@@ -163,14 +165,14 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 					}
 				}
 			}
-        	for (Iterator<Runnable> itr = getQueue().iterator(); itr.hasNext();) {
+			for (Iterator<Runnable> itr = getQueue().iterator(); itr.hasNext();) {
 				Runnable next = itr.next();
 				if (next instanceof ChainedRunnable) {
 					ChainedRunnable r = (ChainedRunnable) next;
 					if (r.getOwner() == owner) {
 						//System.out.println("Appending task " + task + " to queued task " + r);
 						if (r.addNext(task)) {
-					        lastTasks.put(owner, task);
+							lastTasks.put(owner, task);
 							return true;
 						} else { // runningTask just finished, continue to execute
 							return false;
@@ -178,110 +180,114 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 					}
 				}
 			}
-        	ChainedRunnable last = lastTasks.get(owner);
-        	if (last != null && !last.isDone()) {
+			ChainedRunnable last = lastTasks.get(owner);
+			if (last != null && !last.isDone()) {
 				//System.out.println("Appending task " + task + " to last task " + last);
-        		if (last.addNext(task)) {
-			        lastTasks.put(owner, task);
-	        		return true;
+				if (last.addNext(task)) {
+					lastTasks.put(owner, task);
+					return true;
 				} else { // runningTask just finished, continue to execute
-        			return false;
-        		}
-        	}
-        	
-            //System.out.println("Not in queue, starting new worker for " + task);
-	        lastTasks.put(owner, task);
-	        return false;
-        } finally {
-            mainLock.unlock();
-        }
-    }
+					return false;
+				}
+			}
+			
+			//System.out.println("Not in queue, starting new worker for " + task);
+			lastTasks.put(owner, task);
+			return false;
+		} finally {
+			mainLock.unlock();
+		}
+	}
 
-    public void execute(Object owner, Runnable command) {
-        ChainedRunnable task = new ChainedRunnable(owner, command);
-        execute(task);
-    }
+	public void execute(Object owner, Runnable command) {
+		ChainedRunnable task = new ChainedRunnable(owner, command);
+		execute(task);
+	}
 
 	@Override
 	public void execute(Runnable command) {
-        if (command == null)
-            throw new NullPointerException();
-        if (!(command instanceof ChainedRunnable)) {
-        	throw new RuntimeException("Not a chained runnable task");
-        }
-        ChainedRunnable chainCommand = (ChainedRunnable) command;
+		if (command == null)
+			throw new NullPointerException();
+		if (!(command instanceof ChainedRunnable)) {
+			throw new RuntimeException("Not a chained runnable task");
+		}
+		ChainedRunnable chainCommand = (ChainedRunnable) command;
 		if (addIfInQueue(chainCommand)) {
-        	return;
-        }
+			return;
+		}
 		super.execute(command);
 	}
 
 	@Override
 	protected void afterExecute(Runnable r, Throwable t) {
-        final ReentrantLock mainLock = this.internalMainLock;
-        boolean removeError = false;
-        mainLock.lock();
-        try {
-    		for (Map.Entry<Runnable, ChainedRunnable> entry : runningTasks.entrySet()) {
-    			if (entry.getValue() == r) {
-    				runningTasks.remove(entry.getKey());
-    				break;
-    			}
-    		}
-    		if (r instanceof ChainedRunnable) {
-    			ChainedRunnable task = (ChainedRunnable) r;
-    			Object owner = task.getOwner();
-    			ChainedRunnable lastTask = lastTasks.get(owner);
-    			if (lastTask == task) {
-    				ChainedRunnable last = lastTasks.remove(owner);
-    				removeError = last != task;
-    			}
-    		}
-        } finally {
-            mainLock.unlock();
-        }
+		final ReentrantLock mainLock = this.internalMainLock;
+		boolean removeError = false;
+		mainLock.lock();
+		try {
+			for (Map.Entry<Runnable, ChainedRunnable> entry : currentTasks.entrySet()) {
+				if (entry.getValue() == r) {
+					currentTasks.remove(entry.getKey());
+					break;
+				}
+			}
+			if (r instanceof ChainedRunnable) {
+				ChainedRunnable task = (ChainedRunnable) r;
+				Object owner = task.getOwner();
+				ChainedRunnable lastTask = lastTasks.get(owner);
+				ChainedRunnable lastRun = task.getLastRun();
+				if (lastTask == lastRun) {
+					ChainedRunnable last = lastTasks.remove(owner);
+					removeError = last != lastRun;
+				}
+			}
+		} finally {
+			mainLock.unlock();
+		}
 		if (removeError) {
 			System.out.println("Removed updated last task " + r);
+		}
+		if (peekingPoolStatus) {
+			System.out.println("Current tasks size: " + currentTasks.size() + ", last tasks size: " + lastTasks.size());
 		}
 		super.afterExecute(r, t);
 	}
 
 	@Override
 	protected void beforeExecute(Thread t, Runnable r) {
-        final ReentrantLock mainLock = this.internalMainLock;
-        mainLock.lock();
-        try {
-    		for (Runnable worker : internalWorkers) {
-    			try {
-    				if (fieldWorkerThread == null) {
-    					Field f = worker.getClass().getDeclaredField("thread");
-    					if (f != null) {
-    						f.setAccessible(true);
-    					}
-    					fieldWorkerThread = f;
-    				}
-    				if (fieldWorkerThread != null) {
-    					Object value = fieldWorkerThread.get(worker);
-    					if (t == value) {
-    						if (r instanceof ChainedRunnable) {
-    							runningTasks.put(worker, (ChainedRunnable) r);
-    							break;
-    						} // else dummy task
-    					}
-    				}
-    			} catch (SecurityException e) {
-    				e.printStackTrace();
-    			} catch (IllegalArgumentException e) {
-    				e.printStackTrace();
-    			} catch (NoSuchFieldException e) {
-    				e.printStackTrace();
-    			} catch (IllegalAccessException e) {
-    				e.printStackTrace();
-    			}
-    		}
-        } finally {
-            mainLock.unlock();
-        }
+		final ReentrantLock mainLock = this.internalMainLock;
+		mainLock.lock();
+		try {
+			for (Runnable worker : internalWorkers) {
+				try {
+					if (fieldWorkerThread == null) {
+						Field f = worker.getClass().getDeclaredField("thread");
+						if (f != null) {
+							f.setAccessible(true);
+						}
+						fieldWorkerThread = f;
+					}
+					if (fieldWorkerThread != null) {
+						Object value = fieldWorkerThread.get(worker);
+						if (t == value) {
+							if (r instanceof ChainedRunnable) {
+								currentTasks.put(worker, (ChainedRunnable) r);
+								break;
+							} // else dummy task
+						}
+					}
+				} catch (SecurityException e) {
+					e.printStackTrace();
+				} catch (IllegalArgumentException e) {
+					e.printStackTrace();
+				} catch (NoSuchFieldException e) {
+					e.printStackTrace();
+				} catch (IllegalAccessException e) {
+					e.printStackTrace();
+				}
+			}
+		} finally {
+			mainLock.unlock();
+		}
 		super.beforeExecute(t, r);
 	}
 	
