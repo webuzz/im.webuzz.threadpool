@@ -52,6 +52,12 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 			e.printStackTrace();
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+			if (e.getClass().getName().equals("java.lang.reflect.InaccessibleObjectException")) {
+				System.err.println("For Java 9+, please add VM arguments \"--add-opens java.base/java.util.concurrent=ALL-UNNAMED\" and run again.");
+				System.exit(1);
+			}
 		}
 	}
 	
@@ -236,6 +242,7 @@ public class ChainedThreadPoolExecutor extends SimpleThreadPoolExecutor {
 				ChainedRunnable lastTask = lastTasks.get(owner);
 				ChainedRunnable lastRun = task.getLastRun();
 				if (lastTask == lastRun) {
+					task.reset();
 					ChainedRunnable last = lastTasks.remove(owner);
 					removeError = last != lastRun;
 				}

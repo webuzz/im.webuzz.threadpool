@@ -29,6 +29,7 @@ public class ChainedRunnable implements Runnable {
 	public void runTask() {
 		if (task != null) {
 			task.run();
+			task = null;
 		}
 	}
 
@@ -95,6 +96,13 @@ public class ChainedRunnable implements Runnable {
 
 	public ChainedRunnable getLastRun() {
 		return lastRun;
+	}
+	
+	public void reset() {
+		// set to null to avoid memory leak
+		lastRun = null;
+		owner = null;
+		next = null;
 	}
 	
 	// Not thread safe!

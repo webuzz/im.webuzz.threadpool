@@ -28,7 +28,7 @@ public class ThreadPoolExecutorConfig {
 	 * than maxThreads, this thread will be recycled.
 	 */
 	public long threadIdleSeconds = 60L;
-	
+
 	/**
 	 * Allow thread to time out or not.
 	 */
@@ -39,7 +39,7 @@ public class ThreadPoolExecutorConfig {
 	 * Queue. Default is 100.
 	 */
 	public int queueTasks = 100;
-	
+
 	/**
 	 * Thread name.
 	 */

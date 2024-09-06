@@ -1,9 +1,6 @@
 package im.webuzz.threadpool;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Properties;
-import java.util.concurrent.ThreadPoolExecutor;
 
 public class SimpleThreadPool {
 
@@ -36,19 +33,6 @@ public class SimpleThreadPool {
 			poolExecutor.allowCoreThreadTimeOut(lastConfig.threadTimeout);
 			poolInitialized = true;
 		}
-		
-		if (poolInitialized && poolExecutor != null) {
-			String baseClassName = "net.sf.j2s.ajax.SimpleThreadHelper";
-			try {
-				Class<?> sthClass = Class.forName(baseClassName);
-				Method sPEMethod = sthClass.getMethod("setPoolExecutor", ThreadPoolExecutor.class);
-				if (sPEMethod != null && (sPEMethod.getModifiers() & Modifier.STATIC) != 0) {
-					sPEMethod.invoke(sthClass, poolExecutor);
-				}
-			} catch (Throwable e) {
-				e.printStackTrace();
-			}
-		}
 	}
 
 	public static SimpleThreadPoolExecutor getPoolExecutor() {
@@ -58,7 +42,11 @@ public class SimpleThreadPool {
 	
 	public static void execute(Runnable task) {
 		initializePool();
-		poolExecutor.execute(task);
+		try {
+			poolExecutor.execute(task);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 }

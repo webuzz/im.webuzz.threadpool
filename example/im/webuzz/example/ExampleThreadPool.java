@@ -35,7 +35,7 @@ public class ExampleThreadPool {
 	public static void initializePool() {
 		if (poolInitialized) return;
 		synchronized (ExampleThreadPool.class) {
-			if (poolInitialized)  return;
+			if (poolInitialized) return;
 			lastConfig = pool;
 			if (lastConfig == null) {
 				lastConfig = new ThreadPoolExecutorConfig();
